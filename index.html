@@ -53,7 +53,7 @@
     .block {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       background: #F4F1EC;              /* lighter tray surface inside the toolbar */
       border: 1px solid #ddd6cb;
       border-radius: 16px;
@@ -185,17 +185,18 @@
     <!-- ============ TOOLBAR (three distinct blocks) ============ -->
     <div id="toolbar">
 
-      <!-- Block 1: drawing tools.  (emoji are STEP-1 PLACEHOLDERS only) -->
+      <!-- Block 1: drawing tools, plus the black swatch (moved here so the
+           colours row fits on screen without shrinking anything). -->
       <div class="block tools-block">
         <button class="btn" data-tool="pen"         title="">✏️</button>
         <button class="btn" data-tool="brush"       title="">🖌️</button>
         <button class="btn" data-tool="highlighter" title="">🖍️</button>
         <button class="btn" data-tool="eraser"      title="">🧽</button>
+        <button class="swatch" style="background:#000000" data-colour="#000000"></button>
       </div>
 
       <!-- Block 2: colours + palette opener -->
       <div class="block colours-block">
-        <button class="swatch" style="background:#000000" data-colour="#000000"></button>
         <button class="swatch" style="background:#E23B2E" data-colour="#E23B2E"></button>
         <button class="swatch" style="background:#2E6BE2" data-colour="#2E6BE2"></button>
         <button class="swatch" style="background:#F2C53D" data-colour="#F2C53D"></button>
