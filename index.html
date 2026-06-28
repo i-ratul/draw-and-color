@@ -240,8 +240,8 @@
     const CONFIG = {
       TOOLBAR_HEIGHT_PCT: 14,
       PEN_WIDTH:    4,
-      BRUSH_WIDTH:  22,
-      HILITE_WIDTH: 28,
+      BRUSH_WIDTH:  14,    // was 22 — reduced ~35% after device test
+      HILITE_WIDTH: 18,    // was 28 — reduced ~35% after device test
       HILITE_ALPHA: 0.35,
       ERASER_WIDTH: 40,
       FIXED_COLOURS:   ['#000000','#E23B2E','#2E6BE2','#F2C53D','#3DA35D'],
@@ -268,6 +268,12 @@
     const canvasArea = document.getElementById('canvas-area');
     const drawCanvas = document.getElementById('draw-layer');
     const dctx       = drawCanvas.getContext('2d');
+
+    /* offscreen buffer: holds a snapshot of the canvas taken at the start of
+       a highlighter stroke, so we can redraw the whole stroke cleanly each
+       frame (see the smooth-highlighter logic below). */
+    const buf  = document.createElement('canvas');
+    const bctx = buf.getContext('2d');
 
     /* Make the canvas crisp on this high-density screen:
        - CSS size = the area's layout size (in CSS pixels)
@@ -296,6 +302,8 @@
     function resizeCanvases() {
       if (appEl.classList.contains('hidden')) return;   // not revealed yet
       const m = sizeCanvas(drawCanvas, dctx);
+      buf.width  = drawCanvas.width;     // match device pixels for 1:1 copies
+      buf.height = drawCanvas.height;
       /* Record this once on the real device → fill ART_CANVAS_PX in the spec. */
       console.log(
         'ART_CANVAS_PX = ' + drawCanvas.width + ' × ' + drawCanvas.height +
@@ -347,12 +355,50 @@
     });
 
     /* ---------- pen-only drawing ---------- */
-    let drawing = false;
+    let drawing  = false;
     let lastX = 0, lastY = 0;
+    let hlActive = false;          // is the current stroke a highlighter stroke?
+    let hlPoints = [];             // its points so far, in CSS pixels
 
     function canvasXY(e) {
       const rect = drawCanvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    /* snapshot the whole canvas into the buffer (raw device pixels, 1:1) */
+    function snapshotToBuf() {
+      bctx.setTransform(1, 0, 0, 1, 0, 0);
+      bctx.clearRect(0, 0, buf.width, buf.height);
+      bctx.drawImage(drawCanvas, 0, 0);
+    }
+
+    /* restore the canvas from that snapshot, then re-establish CSS-pixel scaling
+       and the current tool's style. */
+    function restoreFromBuf() {
+      const dpr = window.devicePixelRatio || 1;
+      dctx.setTransform(1, 0, 0, 1, 0, 0);
+      dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      dctx.drawImage(buf, 0, 0);
+      dctx.scale(dpr, dpr);
+      applyToolStyle();
+    }
+
+    /* SMOOTH HIGHLIGHTER: redraw the in-progress stroke from the pre-stroke
+       snapshot as ONE shape at 35%. Because it's a single stroke() call,
+       self-overlaps merge instead of stacking — no dark "beads". */
+    function redrawHighlighter() {
+      restoreFromBuf();
+      if (hlPoints.length === 1) {
+        const p = hlPoints[0];
+        dctx.beginPath();
+        dctx.arc(p.x, p.y, dctx.lineWidth / 2, 0, Math.PI * 2);
+        dctx.fill();
+        return;
+      }
+      dctx.beginPath();
+      dctx.moveTo(hlPoints[0].x, hlPoints[0].y);
+      for (let i = 1; i < hlPoints.length; i++) dctx.lineTo(hlPoints[i].x, hlPoints[i].y);
+      dctx.stroke();
     }
 
     function penDown(e) {
@@ -365,27 +411,42 @@
       const { x, y } = canvasXY(e);
       lastX = x; lastY = y;
 
-      /* a single tap should leave a dot, not nothing */
-      dctx.beginPath();
-      dctx.arc(x, y, dctx.lineWidth / 2, 0, Math.PI * 2);
-      dctx.fill();
+      hlActive = (currentTool === 'highlighter');
+      if (hlActive) {
+        hlPoints = [{ x, y }];
+        snapshotToBuf();           // remember the canvas before this stroke
+        redrawHighlighter();       // show the starting dot
+      } else {
+        /* a single tap should leave a dot, not nothing */
+        dctx.beginPath();
+        dctx.arc(x, y, dctx.lineWidth / 2, 0, Math.PI * 2);
+        dctx.fill();
+      }
     }
 
     function penMove(e) {
       if (!drawing || e.pointerType !== 'pen') return;
       e.preventDefault();
       const { x, y } = canvasXY(e);
-      dctx.beginPath();
-      dctx.moveTo(lastX, lastY);
-      dctx.lineTo(x, y);
-      dctx.stroke();
+
+      if (hlActive) {
+        hlPoints.push({ x, y });
+        redrawHighlighter();
+      } else {
+        dctx.beginPath();
+        dctx.moveTo(lastX, lastY);
+        dctx.lineTo(x, y);
+        dctx.stroke();
+      }
       lastX = x; lastY = y;
     }
 
     function penUp(e) {
       if (!drawing) return;
       e.preventDefault();
-      drawing = false;
+      drawing  = false;
+      hlActive = false;
+      hlPoints = [];
       try { drawCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
     }
 
