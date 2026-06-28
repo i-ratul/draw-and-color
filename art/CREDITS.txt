@@ -1,0 +1,10 @@
+Line-art pictures for "Draw & Colour"
+======================================
+
+All images in this folder were generated programmatically for this project
+(simple geometric outlines: star, heart, balloon, house, flower, fish, sun, car).
+
+Licence: CC0 1.0 (public domain dedication). No attribution required.
+You may add your own PNGs here — transparent background, black outline only,
+authored at 1080 x 1555 px (the device canvas size). Then add the filename to
+the ART_FILES list in index.html so the Pictures popup can show it.

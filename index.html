@@ -190,13 +190,88 @@
       background: #e3ddd1;
       box-shadow: inset 0 0 0 3px #b3a991;
     }
+    /* dimmed action button when it has nothing to do (e.g. empty undo) */
+    .btn.dim { opacity: 0.3; pointer-events: none; }
+
+    /* ---------- icons (SVG, no text) ---------- */
+    .btn svg   { width: 32px; height: 32px; color: #5a544b; pointer-events: none; }
+    .arrow svg { width: 30px; height: 30px; color: #ffffff; pointer-events: none; }
+
+    /* ---------- selected colour ring ---------- */
+    .swatch.selected {
+      box-shadow: 0 0 0 4px #4a4640;
+    }
+
+    /* ===========================================================
+       POPUPS  (palette + pictures) — finger-operated, dimmed back
+       =========================================================== */
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .backdrop[hidden] { display: none; }
+
+    .panel {
+      background: #F4F1EC;
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+      display: grid;
+      gap: 14px;
+      max-width: 92vw;
+    }
+
+    /* palette: grid of large colour squares */
+    #palette-grid { grid-template-columns: repeat(4, 1fr); }
+    .palette-cell {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 0 1px #c9c2b6;
+      cursor: pointer;
+    }
+
+    /* pictures: grid of thumbnails (white tiles) */
+    #pictures-grid { grid-template-columns: repeat(2, 1fr); }
+    .picture-cell {
+      width: 38vw;
+      max-width: 150px;
+      height: 38vw;
+      max-height: 150px;
+      background: #ffffff;
+      border: 1px solid #c9c2b6;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .picture-cell img {
+      max-width: 86%;
+      max-height: 86%;
+    }
+    /* the "blank page" tile is just an empty white square */
+    .picture-cell.blank { background: #ffffff; }
   </style>
 </head>
 
 <body>
   <!-- ============ START SCREEN (first tap → fullscreen) ============ -->
   <div id="start-screen">
-    <button id="start-btn" title="">✏️</button>
+    <button id="start-btn" title="" aria-label="start">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#5a544b" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round" style="width:46%;height:46%">
+        <path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/>
+        <path d="M14 7l3 3"/>
+      </svg>
+    </button>
   </div>
 
   <div id="app" class="hidden">
@@ -207,28 +282,69 @@
       <!-- Block 1: drawing tools, plus the black swatch (moved here so the
            colours row fits on screen without shrinking anything). -->
       <div class="block tools-block">
-        <button class="btn selected" data-tool="pen" title="">✏️</button>
-        <button class="btn" data-tool="brush"       title="">🖌️</button>
-        <button class="btn" data-tool="highlighter" title="">🖍️</button>
-        <button class="btn" data-tool="eraser"      title="">🧽</button>
-        <button class="swatch" style="background:#000000" data-colour="#000000"></button>
+        <button class="btn selected" data-tool="pen" aria-label="pen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/>
+          </svg>
+        </button>
+        <button class="btn" data-tool="brush" aria-label="brush">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21c1.4 0 3-1 3-3l1.8-1.8 3 3L11 19c0 2-2 3-4.5 2.6"/>
+            <path d="M9.2 16.4l8-8a2 2 0 0 0-2.8-2.8l-8 8"/>
+          </svg>
+        </button>
+        <button class="btn" data-tool="highlighter" aria-label="highlighter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 19h6"/><path d="M8.5 16.5l-2.5 0L5 19h4l-.5-2.5z"/>
+            <path d="M8 16l6.5-6.5 3 3L11 19"/><path d="M12.5 8l3 3"/>
+          </svg>
+        </button>
+        <button class="btn" data-tool="eraser" aria-label="eraser">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 18l-3-3a2 2 0 0 1 0-3l6-6a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3l-5 5H8z"/>
+            <path d="M6 18h13"/>
+          </svg>
+        </button>
+        <button class="swatch selected" style="background:#000000" data-colour="#000000"
+                aria-label="black"></button>
       </div>
 
       <!-- Block 2: colours + palette opener -->
       <div class="block colours-block">
-        <button class="swatch" style="background:#E23B2E" data-colour="#E23B2E"></button>
-        <button class="swatch" style="background:#2E6BE2" data-colour="#2E6BE2"></button>
-        <button class="swatch" style="background:#F2C53D" data-colour="#F2C53D"></button>
-        <button class="swatch" style="background:#3DA35D" data-colour="#3DA35D"></button>
-        <button class="swatch palette-swatch" id="btn-palette"></button>
+        <button class="swatch" style="background:#E23B2E" data-colour="#E23B2E" aria-label="red"></button>
+        <button class="swatch" style="background:#2E6BE2" data-colour="#2E6BE2" aria-label="blue"></button>
+        <button class="swatch" style="background:#F2C53D" data-colour="#F2C53D" aria-label="yellow"></button>
+        <button class="swatch" style="background:#3DA35D" data-colour="#3DA35D" aria-label="green"></button>
+        <button class="swatch palette-swatch" id="btn-palette" aria-label="more colours"></button>
       </div>
 
       <!-- Block 3: undo, page arrows, pictures -->
       <div class="block actions-block">
-        <button class="btn"   id="btn-undo"     title="">↩️</button>
-        <button class="arrow disabled" id="arrow-left">◀</button>
-        <button class="arrow"          id="arrow-right">▶</button>
-        <button class="btn"   id="btn-pictures" title="">🖼️</button>
+        <button class="btn dim" id="btn-undo" aria-label="undo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 12h10a4.5 4.5 0 0 1 0 9H9"/><path d="M8 8l-4 4 4 4"/>
+          </svg>
+        </button>
+        <button class="arrow disabled" id="arrow-left" aria-label="previous page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <button class="arrow" id="arrow-right" aria-label="next page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="btn" id="btn-pictures" aria-label="pictures">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="18" height="14" rx="2"/>
+            <circle cx="8.5" cy="10" r="1.5"/><path d="M21 16l-5-5L6 19"/>
+          </svg>
+        </button>
       </div>
 
     </div>
@@ -239,6 +355,16 @@
       <canvas id="draw-layer"></canvas>
     </div>
 
+  </div>
+
+  <!-- ============ PALETTE POPUP ============ -->
+  <div class="backdrop" id="palette-popup" hidden>
+    <div class="panel"><div id="palette-grid"></div></div>
+  </div>
+
+  <!-- ============ PICTURES POPUP ============ -->
+  <div class="backdrop" id="pictures-popup" hidden>
+    <div class="panel"><div id="pictures-grid"></div></div>
   </div>
 
   <script>
@@ -253,15 +379,24 @@
       HILITE_ALPHA: 0.35,
       ERASER_WIDTH: 40,
       FIXED_COLOURS:   ['#000000','#E23B2E','#2E6BE2','#F2C53D','#3DA35D'],
-      PALETTE_COLOURS: [],   // filled in at Step 7
+      PALETTE_COLOURS: [    // 12 calm colours for the popup (4 × 3 grid)
+        '#000000','#6E6E6E','#E23B2E','#F2914B',
+        '#F2C53D','#3DA35D','#2E9E9E','#2E6BE2',
+        '#6A5ACD','#B05BD6','#D65B9A','#8B5A2B'
+      ],
       PAGE_COUNT:     10,
-      PICTURES_SHOWN: 6,
+      PICTURES_SHOWN: 5,     // random pictures shown; a blank tile is added as the 1st (6 tiles total)
       UNDO_DEPTH:     3,
       MIN_BUTTON_PX:  64,
       MIN_ARROW_PX:   72,
       TOOLBAR_BG: '#ECE9E4',
       PAGE_BG:    '#FFFFFF'
     };
+
+    /* line-art files in /art/ (the manifest — static hosting can't list a
+       folder, so picture filenames are declared here). */
+    const ART_FILES = ['star.png','heart.png','balloon.png','house.png',
+                       'flower.png','fish.png','sun.png','car.png'];
 
     /* =========================================================
        STEP 2 — Start screen → fullscreen → reveal app
@@ -309,43 +444,64 @@
       return { cssW, cssH, dpr };
     }
 
-    function resizeCanvases() {
-      if (appEl.classList.contains('hidden')) return;   // not revealed yet
-      const m = sizeCanvas(artCanvas,  actx);           // back layer (outline)
-      sizeCanvas(drawCanvas, dctx);                     // front layer (strokes)
-      buf.width  = drawCanvas.width;     // match device pixels for 1:1 copies
-      buf.height = drawCanvas.height;
+    /* current canvas size in CSS pixels (used for fitting pictures) */
+    let CSS_W = 0, CSS_H = 0;
 
-      drawTestOutline(m.cssW, m.cssH);   // TEMPORARY (Step 5): replaced by real art at Step 8
-
-      /* Record this once on the real device → fill ART_CANVAS_PX in the spec. */
-      console.log(
-        'ART_CANVAS_PX = ' + drawCanvas.width + ' × ' + drawCanvas.height +
-        '  (CSS ' + m.cssW + '×' + m.cssH + ', dpr ' + m.dpr + ')'
-      );
+    /* re-apply CSS-pixel scaling + round line style to a context */
+    function applyScale(ctx) {
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      ctx.lineCap  = 'round';
+      ctx.lineJoin = 'round';
     }
 
-    /* TEMPORARY (Step 5 only): draw a star outline on the artLayer so we can
-       confirm the eraser can never touch it. Real pictures replace this at
-       Step 8 — this whole function goes away then. */
-    function drawTestOutline(cssW, cssH) {
-      const cx = cssW / 2, cy = cssH / 2;
-      const R  = Math.min(cssW, cssH) * 0.34;   // outer radius
-      const r  = R * 0.45;                       // inner radius
-      actx.clearRect(0, 0, cssW, cssH);
-      actx.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const rad = (i % 2 === 0) ? R : r;
-        const ang = -Math.PI / 2 + i * Math.PI / 5;
-        const px = cx + rad * Math.cos(ang);
-        const py = cy + rad * Math.sin(ang);
-        if (i === 0) actx.moveTo(px, py); else actx.lineTo(px, py);
-      }
-      actx.closePath();
-      actx.lineWidth   = 6;
-      actx.lineJoin    = 'round';
-      actx.strokeStyle = '#333333';
-      actx.stroke();
+    /* wipe a layer fully transparent */
+    function clearLayer(ctx, canvas) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      applyScale(ctx);
+    }
+
+    /* REPLACE a layer's contents with a source canvas, scaled to fill the
+       device pixels. Clears first, so callers get a true replace (this is what
+       undo / page-restore / resize all need). */
+    function blit(src, ctx, canvas) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+      applyScale(ctx);
+    }
+
+    /* take a 1:1 device-pixel snapshot of a canvas into a fresh offscreen canvas */
+    function snapshot(canvas) {
+      const c = document.createElement('canvas');
+      c.width = canvas.width; c.height = canvas.height;
+      c.getContext('2d').drawImage(canvas, 0, 0);
+      return c;
+    }
+
+    function resizeCanvases() {
+      if (appEl.classList.contains('hidden')) return;   // not revealed yet
+
+      /* preserve whatever is on screen across a resize (e.g. the address bar
+         re-appearing changes the height and would otherwise clear the canvas). */
+      const had = drawCanvas.width > 0;
+      const artSnap  = had ? snapshot(artCanvas)  : null;
+      const drawSnap = had ? snapshot(drawCanvas) : null;
+
+      const m = sizeCanvas(artCanvas,  actx);    // back layer (outline)
+      sizeCanvas(drawCanvas, dctx);              // front layer (strokes)
+      buf.width  = drawCanvas.width;             // match device pixels for 1:1 copies
+      buf.height = drawCanvas.height;
+      CSS_W = m.cssW; CSS_H = m.cssH;
+
+      if (artSnap)  blit(artSnap,  actx, artCanvas);
+      if (drawSnap) blit(drawSnap, dctx, drawCanvas);
     }
 
     /* =========================================================
@@ -446,6 +602,7 @@
       drawing = true;
       try { drawCanvas.setPointerCapture(e.pointerId); } catch (_) {}
 
+      pushUndo();                            // remember drawLayer before this stroke
       applyToolStyle();
       const { x, y } = canvasXY(e);
       lastX = x; lastY = y;
@@ -494,6 +651,160 @@
     drawCanvas.addEventListener('pointerup',     penUp,   { passive: false });
     drawCanvas.addEventListener('pointercancel', penUp,   { passive: false });
 
+    /* =========================================================
+       STEP 6 — Colours (five fixed swatches + black)
+       ========================================================= */
+    function selectColour(hex) {
+      currentColour = hex;
+      document.querySelectorAll('[data-colour]').forEach(b =>
+        b.classList.toggle('selected', b.dataset.colour === hex));
+    }
+    document.querySelectorAll('[data-colour]').forEach(sw => {
+      sw.addEventListener('click', () => selectColour(sw.dataset.colour));
+    });
+
+    /* =========================================================
+       STEP 7 — Palette popup (12 colours, backdrop-tap to close)
+       ========================================================= */
+    const palettePopup = document.getElementById('palette-popup');
+    const paletteGrid   = document.getElementById('palette-grid');
+    CONFIG.PALETTE_COLOURS.forEach(hex => {
+      const cell = document.createElement('button');
+      cell.className = 'palette-cell';
+      cell.style.background = hex;
+      cell.addEventListener('click', () => {
+        selectColour(hex);                 // fixed swatches lose their ring (fine)
+        palettePopup.hidden = true;
+      });
+      paletteGrid.appendChild(cell);
+    });
+    document.getElementById('btn-palette').addEventListener('click', () => {
+      palettePopup.hidden = false;
+    });
+    palettePopup.addEventListener('click', e => {
+      if (e.target === palettePopup) palettePopup.hidden = true;   // backdrop tap
+    });
+
+    /* =========================================================
+       STEP 8 — Pictures popup (blank + random line-art onto artLayer)
+       ========================================================= */
+    const picturesPopup = document.getElementById('pictures-popup');
+    const picturesGrid  = document.getElementById('pictures-grid');
+
+    /* draw a line-art PNG onto the artLayer, "contain"-fit and centred */
+    function loadPicture(src) {
+      const img = new Image();
+      img.onload = () => {
+        clearLayer(actx, artCanvas);       // replace any previous outline
+        const scale = Math.min(CSS_W / img.naturalWidth, CSS_H / img.naturalHeight);
+        const w = img.naturalWidth  * scale;
+        const h = img.naturalHeight * scale;
+        actx.drawImage(img, (CSS_W - w) / 2, (CSS_H - h) / 2, w, h);
+      };
+      img.src = src;
+    }
+
+    function buildPicturesGrid() {
+      picturesGrid.innerHTML = '';
+
+      /* first tile = blank: clears the outline layer (the only "clear" in the
+         app, and it only touches the outline, never the child's strokes). */
+      const blank = document.createElement('button');
+      blank.className = 'picture-cell blank';
+      blank.setAttribute('aria-label', 'blank page');
+      blank.addEventListener('click', () => {
+        clearLayer(actx, artCanvas);
+        applyToolStyle();
+        picturesPopup.hidden = true;
+      });
+      picturesGrid.appendChild(blank);
+
+      /* then up to PICTURES_SHOWN random pictures (shuffled each open) */
+      const pool = ART_FILES.slice();
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      pool.slice(0, CONFIG.PICTURES_SHOWN).forEach(file => {
+        const cell = document.createElement('button');
+        cell.className = 'picture-cell';
+        const img = document.createElement('img');
+        img.src = 'art/' + file;
+        cell.appendChild(img);
+        cell.addEventListener('click', () => {
+          loadPicture('art/' + file);
+          picturesPopup.hidden = true;
+        });
+        picturesGrid.appendChild(cell);
+      });
+    }
+
+    document.getElementById('btn-pictures').addEventListener('click', () => {
+      buildPicturesGrid();
+      picturesPopup.hidden = false;
+    });
+    picturesPopup.addEventListener('click', e => {
+      if (e.target === picturesPopup) picturesPopup.hidden = true;   // backdrop tap
+    });
+
+    /* =========================================================
+       STEP 9 — Pages (10), each remembers both layers for the session
+       ========================================================= */
+    const pages = Array.from({ length: CONFIG.PAGE_COUNT }, () => ({ art: null, draw: null }));
+    let curPage = 0;
+
+    const arrowLeft  = document.getElementById('arrow-left');
+    const arrowRight = document.getElementById('arrow-right');
+
+    function snapshotCurrentPage() {
+      pages[curPage].art  = snapshot(artCanvas);
+      pages[curPage].draw = snapshot(drawCanvas);
+    }
+    function restorePage(i) {
+      clearLayer(actx, artCanvas);
+      clearLayer(dctx, drawCanvas);
+      if (pages[i].art)  blit(pages[i].art,  actx, artCanvas);
+      if (pages[i].draw) blit(pages[i].draw, dctx, drawCanvas);
+      applyToolStyle();
+    }
+    function updateArrows() {
+      arrowLeft.classList.toggle('disabled',  curPage === 0);
+      arrowRight.classList.toggle('disabled', curPage === CONFIG.PAGE_COUNT - 1);
+    }
+    function goToPage(i) {
+      if (i < 0 || i >= CONFIG.PAGE_COUNT || i === curPage) return;
+      snapshotCurrentPage();
+      curPage = i;
+      restorePage(curPage);
+      undoStack = [];          // undo is per-page + short-term (spec §11)
+      updateUndoButton();
+      updateArrows();
+    }
+    arrowLeft.addEventListener('click',  () => goToPage(curPage - 1));
+    arrowRight.addEventListener('click', () => goToPage(curPage + 1));
+
+    /* =========================================================
+       STEP 10 — Undo (last 3 strokes on the current page)
+       ========================================================= */
+    let undoStack = [];
+    const undoBtn = document.getElementById('btn-undo');
+
+    function pushUndo() {
+      undoStack.push(snapshot(drawCanvas));
+      if (undoStack.length > CONFIG.UNDO_DEPTH) undoStack.shift();  // keep last 3
+      updateUndoButton();
+    }
+    function undo() {
+      if (!undoStack.length) return;
+      blit(undoStack.pop(), dctx, drawCanvas);
+      applyToolStyle();
+      updateUndoButton();
+    }
+    function updateUndoButton() {
+      undoBtn.classList.toggle('dim', undoStack.length === 0);
+    }
+    undoBtn.addEventListener('click', undo);
+
     /* Ask the browser to go fullscreen (hides Chrome's address bar/tabs).
        Must happen inside a real user tap — the Start button click. */
     function requestFullscreen() {
@@ -516,6 +827,8 @@
          a resize. */
       resizeCanvases();
       requestAnimationFrame(resizeCanvases);
+      updateArrows();          // left arrow dimmed on page 1
+      updateUndoButton();      // undo dimmed until the first stroke
     }
 
     /* Use 'click' so a finger tap (or a mouse, for desktop testing) works.
