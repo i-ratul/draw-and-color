@@ -142,7 +142,7 @@ Four drawing tools. **Exactly one is selected at a time.** The selected tool sho
 ### 6.1 Art asset specification
 - All line-art PNGs live in `/art/` with **transparent background** and **black outlines** only (no fill).
 - **Author them at the canvas's physical pixel size** for crispness. Compute the target as: canvas CSS width × DPR by canvas CSS height × DPR. For planning, assume the canvas area is roughly the full phone width × 86% of height. **The PRD author (you) will measure the exact canvas pixel size on-device once during the first build and record it here:**
-  - `ART_CANVAS_PX = ____ × ____`  ← **fill in after first run** (log it via `canvas.width`/`canvas.height` after the high-DPI sizing step).
+  - `ART_CANVAS_PX = 1080 × 1555`  ← measured on the S22 Ultra in fullscreen Chrome (CSS area 384×553, devicePixelRatio 2.8125). Author line-art at this size (portrait, transparent, black line) for crispness.
 - Until measured, author art at a safe **1200 × 2000 px** (portrait, transparent, black line, centred subject with margin). This will scale cleanly.
 - Keep file sizes modest (these are simple line drawings; each should be well under ~300 KB).
 - Maintain a `/art/CREDITS.txt` noting the source/licence (CC0) of each image, per project hygiene.
