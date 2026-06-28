@@ -240,7 +240,7 @@
     const CONFIG = {
       TOOLBAR_HEIGHT_PCT: 14,
       PEN_WIDTH:    4,
-      BRUSH_WIDTH:  14,    // was 22 — reduced ~35% after device test
+      BRUSH_WIDTH:  10,    // was 22 → 14 → 10, reduced after device tests
       HILITE_WIDTH: 18,    // was 28 — reduced ~35% after device test
       HILITE_ALPHA: 0.35,
       ERASER_WIDTH: 40,
@@ -377,10 +377,12 @@
     function restoreFromBuf() {
       const dpr = window.devicePixelRatio || 1;
       dctx.setTransform(1, 0, 0, 1, 0, 0);
+      dctx.globalAlpha = 1;                          // restore at FULL opacity
+      dctx.globalCompositeOperation = 'source-over'; // (not the highlighter's 35%)
       dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
       dctx.drawImage(buf, 0, 0);
       dctx.scale(dpr, dpr);
-      applyToolStyle();
+      applyToolStyle();                              // now set the highlighter style
     }
 
     /* SMOOTH HIGHLIGHTER: redraw the in-progress stroke from the pre-stroke
