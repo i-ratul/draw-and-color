@@ -108,8 +108,14 @@
       overflow: hidden;
     }
 
-    /* the two stacked canvases will live here (added in later steps).
-       For step 1 this is just an empty white area — nothing overlaid. */
+    /* the drawing canvas fills the whole pen-only area.
+       (Step 5 splits this into two stacked layers; for now it's one.) */
+    #draw-layer {
+      position: absolute;
+      inset: 0;
+      display: block;
+      touch-action: none;              /* no scroll/zoom gestures on the canvas */
+    }
 
     /* ---------- page-navigation arrows (now live in the toolbar) ---------- */
     .arrow {
@@ -216,7 +222,7 @@
 
     <!-- ============ CANVAS AREA (pen-only, nothing overlaid) ============ -->
     <div id="canvas-area">
-      <!-- artLayer + drawLayer canvases are added in later steps -->
+      <canvas id="draw-layer"></canvas>
     </div>
 
   </div>
@@ -250,12 +256,98 @@
     const startBtn    = document.getElementById('start-btn');
     const appEl       = document.getElementById('app');
 
-    /* Placeholder: the real high-DPI canvas sizing arrives in Step 3.
-       It MUST run after fullscreen, because hiding the address bar
-       changes the available height. We wire the call site up now. */
-    function resizeCanvases() {
-      /* Step 3 fills this in (size both canvases for devicePixelRatio). */
+    /* =========================================================
+       STEP 3 — High-DPI drawing canvas + pen-only input
+       ========================================================= */
+    const canvasArea = document.getElementById('canvas-area');
+    const drawCanvas = document.getElementById('draw-layer');
+    const dctx       = drawCanvas.getContext('2d');
+
+    /* Make the canvas crisp on this high-density screen:
+       - CSS size = the area's layout size (in CSS pixels)
+       - drawing buffer = CSS size × devicePixelRatio (the real pixels)
+       - scale the context so all our drawing code stays in CSS pixels
+       NOTE: setting canvas.width/height clears the canvas and resets the
+       context, so we re-apply the scale and line style every time. */
+    function sizeCanvas(canvas, ctx) {
+      const rect = canvasArea.getBoundingClientRect();
+      const cssW = Math.round(rect.width);
+      const cssH = Math.round(rect.height);
+      const dpr  = window.devicePixelRatio || 1;
+
+      canvas.style.width  = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+      canvas.width  = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);   // clear any previous scaling
+      ctx.scale(dpr, dpr);                   // now 1 unit = 1 CSS pixel
+      ctx.lineCap  = 'round';
+      ctx.lineJoin = 'round';
+      return { cssW, cssH, dpr };
     }
+
+    function resizeCanvases() {
+      if (appEl.classList.contains('hidden')) return;   // not revealed yet
+      const m = sizeCanvas(drawCanvas, dctx);
+      /* Record this once on the real device → fill ART_CANVAS_PX in the spec. */
+      console.log(
+        'ART_CANVAS_PX =', drawCanvas.width + ' × ' + drawCanvas.height +
+        '  (CSS ' + m.cssW + '×' + m.cssH + ', dpr ' + m.dpr + ')'
+      );
+    }
+
+    /* ---------- pen-only drawing ---------- */
+    let drawing = false;
+    let lastX = 0, lastY = 0;
+
+    function canvasXY(e) {
+      const rect = drawCanvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function penDown(e) {
+      if (e.pointerType !== 'pen') return;   // PEN ONLY — this is our palm rejection
+      e.preventDefault();
+      drawing = true;
+      try { drawCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+
+      const { x, y } = canvasXY(e);
+      lastX = x; lastY = y;
+
+      dctx.globalCompositeOperation = 'source-over';
+      dctx.strokeStyle = '#000000';          // black for now (colours come at Step 6)
+      dctx.fillStyle   = '#000000';
+      dctx.lineWidth   = CONFIG.PEN_WIDTH;
+
+      /* a single tap should leave a dot, not nothing */
+      dctx.beginPath();
+      dctx.arc(x, y, CONFIG.PEN_WIDTH / 2, 0, Math.PI * 2);
+      dctx.fill();
+    }
+
+    function penMove(e) {
+      if (!drawing || e.pointerType !== 'pen') return;
+      e.preventDefault();
+      const { x, y } = canvasXY(e);
+      dctx.beginPath();
+      dctx.moveTo(lastX, lastY);
+      dctx.lineTo(x, y);
+      dctx.stroke();
+      lastX = x; lastY = y;
+    }
+
+    function penUp(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      drawing = false;
+      try { drawCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+
+    drawCanvas.addEventListener('pointerdown',   penDown, { passive: false });
+    drawCanvas.addEventListener('pointermove',   penMove, { passive: false });
+    drawCanvas.addEventListener('pointerup',     penUp,   { passive: false });
+    drawCanvas.addEventListener('pointercancel', penUp,   { passive: false });
 
     /* Ask the browser to go fullscreen (hides Chrome's address bar/tabs).
        Must happen inside a real user tap — the Start button click. */
