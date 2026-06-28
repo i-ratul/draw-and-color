@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Portrait phone, no pinch-zoom, fill the notch area -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#ECE9E4" />
+  <title>Draw &amp; Colour</title>
+
+  <style>
+    /* ---------- global reset ---------- */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;                 /* never scroll the page */
+      background: #FFFFFF;              /* page background is white */
+      overscroll-behavior: none;        /* no rubber-band scroll */
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;       /* canvas itself overrides to none */
+      font-family: sans-serif;          /* only used for emoji placeholders in step 1 */
+    }
+
+    /* ===========================================================
+       APP LAYOUT  (top toolbar + bottom canvas), filling viewport
+       =========================================================== */
+    #app {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---------- TOOLBAR (finger-only control strip) ---------- */
+    #toolbar {
+      flex: 0 0 auto;                   /* height grows to fit the three blocks */
+      background: #ECE9E4;              /* warm grey: visibly different from white canvas */
+      border-bottom: 2px solid #d2cdc4; /* subtle boundary line */
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);  /* subtle shadow reinforces the boundary */
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      z-index: 10;
+    }
+
+    /* each toolbar GROUP is its own tray, so the three blocks read as
+       distinct zones: tools / colours / actions(undo+arrows+pictures) */
+    .block {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #F4F1EC;              /* lighter tray surface inside the toolbar */
+      border: 1px solid #ddd6cb;
+      border-radius: 16px;
+      padding: 6px 10px;
+    }
+    .tools-block   { justify-content: center; }
+    .colours-block { justify-content: center; }
+    .actions-block { justify-content: space-around; }
+
+    /* ---------- generic button look (placeholders for now) ---------- */
+    .btn {
+      flex: 0 0 auto;
+      min-width: 64px;                  /* MIN_BUTTON_PX */
+      height: 100%;
+      max-height: 64px;
+      aspect-ratio: 1 / 1;
+      border: none;
+      border-radius: 14px;
+      background: #F7F5F2;
+      box-shadow: inset 0 0 0 1px #ddd6cb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;                  /* emoji placeholder size */
+      color: #5a544b;
+      cursor: pointer;
+    }
+
+    /* colour swatches in row 2 */
+    .swatch {
+      flex: 0 0 auto;
+      min-width: 64px;
+      height: 100%;
+      max-height: 64px;
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 0 1px #c9c2b6;
+      cursor: pointer;
+    }
+
+    /* the "more colours" opener: a small rainbow swatch */
+    .palette-swatch {
+      background: conic-gradient(#E23B2E, #F2C53D, #3DA35D, #2E6BE2, #8e5bd6, #E23B2E);
+    }
+
+    /* ---------- CANVAS AREA (pen-only drawing zone) ---------- */
+    #canvas-area {
+      flex: 1 1 auto;                   /* the remaining ~86% */
+      position: relative;
+      background: #FFFFFF;
+      overflow: hidden;
+    }
+
+    /* the two stacked canvases will live here (added in later steps).
+       For step 1 this is just an empty white area — nothing overlaid. */
+
+    /* ---------- page-navigation arrows (now live in the toolbar) ---------- */
+    .arrow {
+      flex: 0 0 auto;
+      min-width: 64px;
+      height: 100%;
+      max-height: 64px;
+      aspect-ratio: 1 / 1;
+      border: none;
+      border-radius: 50%;
+      background: rgba(120, 114, 104, 0.32);   /* soft grey: reads as "navigation" */
+      color: #ffffff;
+      font-size: 28px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* dimmed + inert state (e.g. left arrow on page 1) */
+    .arrow.disabled {
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    /* ===========================================================
+       START SCREEN  (calm cover; first tap → fullscreen + reveal)
+       =========================================================== */
+    #start-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #ECE9E4;              /* same calm warm grey as the toolbar */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* one large central button, no text — just an icon */
+    #start-btn {
+      width: 40vw;
+      height: 40vw;
+      max-width: 260px;
+      max-height: 260px;
+      min-width: 160px;
+      min-height: 160px;
+      border: none;
+      border-radius: 50%;
+      background: #F7F5F2;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15), inset 0 0 0 2px #ddd6cb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 96px;                  /* emoji placeholder; real icon at polish step */
+      cursor: pointer;
+    }
+    /* a gentle press feedback (the only animation — calm, not bouncy) */
+    #start-btn:active { background: #efece6; }
+
+    /* hide the app behind the start screen until the first tap */
+    #app.hidden { visibility: hidden; }
+  </style>
+</head>
+
+<body>
+  <!-- ============ START SCREEN (first tap → fullscreen) ============ -->
+  <div id="start-screen">
+    <button id="start-btn" title="">✏️</button>
+  </div>
+
+  <div id="app" class="hidden">
+
+    <!-- ============ TOOLBAR (three distinct blocks) ============ -->
+    <div id="toolbar">
+
+      <!-- Block 1: drawing tools.  (emoji are STEP-1 PLACEHOLDERS only) -->
+      <div class="block tools-block">
+        <button class="btn" data-tool="pen"         title="">✏️</button>
+        <button class="btn" data-tool="brush"       title="">🖌️</button>
+        <button class="btn" data-tool="highlighter" title="">🖍️</button>
+        <button class="btn" data-tool="eraser"      title="">🧽</button>
+      </div>
+
+      <!-- Block 2: colours + palette opener -->
+      <div class="block colours-block">
+        <button class="swatch" style="background:#000000" data-colour="#000000"></button>
+        <button class="swatch" style="background:#E23B2E" data-colour="#E23B2E"></button>
+        <button class="swatch" style="background:#2E6BE2" data-colour="#2E6BE2"></button>
+        <button class="swatch" style="background:#F2C53D" data-colour="#F2C53D"></button>
+        <button class="swatch" style="background:#3DA35D" data-colour="#3DA35D"></button>
+        <button class="swatch palette-swatch" id="btn-palette"></button>
+      </div>
+
+      <!-- Block 3: undo, page arrows, pictures -->
+      <div class="block actions-block">
+        <button class="btn"   id="btn-undo"     title="">↩️</button>
+        <button class="arrow disabled" id="arrow-left">◀</button>
+        <button class="arrow"          id="arrow-right">▶</button>
+        <button class="btn"   id="btn-pictures" title="">🖼️</button>
+      </div>
+
+    </div>
+
+    <!-- ============ CANVAS AREA (pen-only, nothing overlaid) ============ -->
+    <div id="canvas-area">
+      <!-- artLayer + drawLayer canvases are added in later steps -->
+    </div>
+
+  </div>
+
+  <script>
+    /* =========================================================
+       CONFIG — all tunable constants live here (Section 12)
+       ========================================================= */
+    const CONFIG = {
+      TOOLBAR_HEIGHT_PCT: 14,
+      PEN_WIDTH:    4,
+      BRUSH_WIDTH:  22,
+      HILITE_WIDTH: 28,
+      HILITE_ALPHA: 0.35,
+      ERASER_WIDTH: 40,
+      FIXED_COLOURS:   ['#000000','#E23B2E','#2E6BE2','#F2C53D','#3DA35D'],
+      PALETTE_COLOURS: [],   // filled in at Step 7
+      PAGE_COUNT:     10,
+      PICTURES_SHOWN: 6,
+      UNDO_DEPTH:     3,
+      MIN_BUTTON_PX:  64,
+      MIN_ARROW_PX:   72,
+      TOOLBAR_BG: '#ECE9E4',
+      PAGE_BG:    '#FFFFFF'
+    };
+
+    /* =========================================================
+       STEP 2 — Start screen → fullscreen → reveal app
+       ========================================================= */
+    const startScreen = document.getElementById('start-screen');
+    const startBtn    = document.getElementById('start-btn');
+    const appEl       = document.getElementById('app');
+
+    /* Placeholder: the real high-DPI canvas sizing arrives in Step 3.
+       It MUST run after fullscreen, because hiding the address bar
+       changes the available height. We wire the call site up now. */
+    function resizeCanvases() {
+      /* Step 3 fills this in (size both canvases for devicePixelRatio). */
+    }
+
+    /* Ask the browser to go fullscreen (hides Chrome's address bar/tabs).
+       Must happen inside a real user tap — the Start button click. */
+    function requestFullscreen() {
+      const root = document.documentElement;
+      const fn = root.requestFullscreen || root.webkitRequestFullscreen;
+      if (!fn) return;                       // desktop browsers may lack it — fine
+      try {
+        const maybePromise = fn.call(root);
+        if (maybePromise && maybePromise.catch) maybePromise.catch(() => {});
+      } catch (e) { /* ignore — app still works in normal view */ }
+    }
+
+    function enterApp() {
+      requestFullscreen();
+      startScreen.style.display = 'none';    // hide the cover
+      appEl.classList.remove('hidden');      // reveal toolbar + canvas
+      /* Size after the layout settles. Fullscreen changes the viewport
+         height, so we also size again on the fullscreenchange/resize
+         events below — this first call covers browsers that don't fire
+         a resize. */
+      resizeCanvases();
+      requestAnimationFrame(resizeCanvases);
+    }
+
+    /* Use 'click' so a finger tap (or a mouse, for desktop testing) works.
+       'once' guarantees this only ever runs for the very first tap. */
+    startBtn.addEventListener('click', enterApp, { once: true });
+
+    /* Re-size whenever the viewport changes (entering/leaving fullscreen,
+       rotation, address bar showing/hiding). Harmless until Step 3. */
+    window.addEventListener('resize', resizeCanvases);
+    document.addEventListener('fullscreenchange', resizeCanvases);
+    document.addEventListener('webkitfullscreenchange', resizeCanvases);
+  </script>
+</body>
+</html>
